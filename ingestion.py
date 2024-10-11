@@ -20,20 +20,26 @@ embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 def ingest_docs():
     loader = ReadTheDocsLoader("stray.fandom.com", encoding='utf-8', patterns="*.html", custom_html_tag=('html', {}))
     raw_documents = loader.load()
-    print(f"Loaded {len(raw_documents)} raw documents")
     print(raw_documents)
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=50)
     documents = text_splitter.split_documents(raw_documents)
     print(f"Loaded {len(documents)} documents")
+
     for doc in documents:
         original_url = doc.metadata["source"]
-        # Ensure the URL is corrected properly
-        if "stray.fandom.com" not in original_url:
-            new_url = "https://stray.fandom.com" + original_url.replace("\\", "/")
-        else:
-            new_url = original_url.replace("\\", "/").replace("stray.fandom.com", "https://stray.fandom.com")
-        doc.metadata.update({"source": new_url})
+        corrected_url = original_url.replace("\\", "/")
+
+        if "stray.fandom.com" not in corrected_url:
+            corrected_url = "https://stray.fandom.com" + corrected_url
+
+        if corrected_url.endswith(".html"):
+            corrected_url = corrected_url[:-5]
+
+        if not corrected_url.startswith("https://"):
+            corrected_url = "https://" + corrected_url.lstrip("http:/")
+
+        doc.metadata.update({"source": corrected_url})
 
     print(f"Going to add {len(documents)} to Pinecone")
     PineconeVectorStore.from_documents(
